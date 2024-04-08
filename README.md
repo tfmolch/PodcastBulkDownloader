@@ -7,7 +7,7 @@
 
 ## How to use Podcast Bulk Downloader
 ### CLI version
-Usage: `PodcastBulkDownloaderCLI.exe -f FOLDER --url RSS_URL [--overwrite] [-l LAST_N]`
+Usage: `python3 src/bulk_downloader.py -f FOLDER --url RSS_URL [--overwrite] [-l LAST_N]`
 
 Arguments:
 * `-h`, `--help`: shows this help message and exit
