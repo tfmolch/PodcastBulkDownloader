@@ -3,7 +3,7 @@
 # Podcast Bulk Downloader
 ![example workflow](https://github.com/cnovel/PodcastBulkDownloader/actions/workflows/python-app.yml/badge.svg) [![codecov](https://codecov.io/gh/cnovel/PodcastBulkDownloader/branch/master/graph/badge.svg)](https://codecov.io/gh/cnovel/PodcastBulkDownloader) ![version](https://img.shields.io/badge/Python-3.7%20%7C%203.8%20%7C%203.9%20%7C%203.10%20%7C%203.11-blue)
 
-**Podcast Bulk Downloader** is a simple soft that allows you to download all the episodes of a podcast feed in a folder.
+**Podcast Bulk Downloader** is a simple soft that allows you to download all the episodes of a podcast feed in a folder. This fork writes Podcast descriptions to the Finder comments so it is only useful on macos
 
 ## How to use Podcast Bulk Downloader
 ### CLI version
@@ -20,8 +20,7 @@ Arguments:
 
 Example:
 ```
-PodcastBulkDownloaderCLI.exe -f "G:\Musique\RadioKawa\Ta Gueule" --url https://feeds.radiokawa.com/podcast_ta-gueule.xml
-```
+python3 src/bulk_downloader.py -f kolisrael/ --url https://www.omnycontent.com/d/playlist/23f697a0-7e6a-4e96-a223-a82c00962b12/4222a8e4-ca1d-4fe3-88f5-a919008d5a53/34de46c9-e299-44d2-9386-a919008d5a58/podcast.rss```
 
 ### GUI Version
 ![PBD_GUI](img/PBD_GUI_v0.8.png)
@@ -46,6 +45,3 @@ To run tests, execute this command in the root folder:
 ```
 pytest -v
 ```
-
-### Creating EXE file
-Execute `create_exe.bat`, it will create the exe files in a subdirectory called `dist`.

@@ -15,15 +15,20 @@ from xml.etree import ElementTree
 from typing import List
 from src import pbd_version
 
+import datetime
+import pathlib
+from osxmetadata import *
+
 
 class BulkDownloaderException(Exception):
     pass
 
 
-def download_with_resume(url: str, path: str, cb: Callback = None) -> bool:
+def download_with_resume(url: str, description: str, path: str, cb: Callback=None) -> bool:
     """
     Download a file pointed by url to a local path
     @param url: URL to download
+    @param description: description of episode to save to Finder comment
     @param path: Local file to be saved
     @param cb: Callback object
     @return: True if the file was completely downloaded
@@ -55,7 +60,7 @@ def download_with_resume(url: str, path: str, cb: Callback = None) -> bool:
     if cb and cb.is_cancelled():
         return False
 
-    chunk_size = 2**20
+    chunk_size = 2 ** 20
     last_byte = 0
     transfer_is_over = False
     with open(path, 'wb') as f:
@@ -73,16 +78,24 @@ def download_with_resume(url: str, path: str, cb: Callback = None) -> bool:
                     cb.progress(100 * (last_byte / expected_size))
                 f.write(data)
                 if len(data) < chunk_size:
+                    
+                    # write the comment to the Finder metadata
+                    logging.info('Adding comment {} to {}'.format(description, path))
+                    
+                    md = OSXMetaData(path)
+                    md.kMDItemFinderComment = description
                     transfer_is_over = True
+                    
             resume_request.close()
     if cb and cb.is_cancelled():
         return False
     if cb:
+        
         cb.progress(100)
     return True
 
 
-def try_download(url, path, max_try=3, sleep_time=5, cb: Callback = None) -> bool:
+def try_download(url, description, path, max_try=3, sleep_time=5, cb: Callback=None) -> bool:
     """
     Try to download the file multiple times, in case of connection failures
     @param url: URL to download
@@ -95,7 +108,7 @@ def try_download(url, path, max_try=3, sleep_time=5, cb: Callback = None) -> boo
     count = 0
     try:
         while count < max_try:
-            if download_with_resume(url, path, cb):
+            if download_with_resume(url, description, path, cb):
                 return True
             if cb and cb.is_cancelled():
                 return False
@@ -128,18 +141,21 @@ class Prefix(Enum):
 
 
 class Episode:
-    def __init__(self, url: str, title: str, date_time: datetime.datetime):
+
+    def __init__(self, url: str, title: str, date_time: datetime.datetime, description: str,):
         """
         Constructor for a podcast episode
         @param url: URL of the MP3 file
         @param title: Title of the episode
         @param date_time: Date time of the episode
+        @param description: description of the episode
         """
         self._url = url
         self._title = title
         self._date_time = date_time
+        self._description = description
 
-    def title(self, title: str = None) -> str:
+    def title(self, title: str=None) -> str:
         if title is not None:
             self._title = title
         return self._title
@@ -156,6 +172,9 @@ class Episode:
 
     def get_date_time(self) -> datetime.datetime:
         return self._date_time
+    
+    def get_description(self) -> str:
+        return self._description
 
     def get_filename(self, prefix: Prefix) -> str:
         filename = self.safe_title() + '.mp3'
@@ -172,8 +191,8 @@ class Episode:
 class BulkDownloader:
     _EXT = '.mp3'
 
-    def __init__(self, url: str, folder: str = None, last_n: int = 0, overwrite: bool = True,
-                 prefix: Prefix = Prefix.NO_PREFIX):
+    def __init__(self, url: str, folder: str=None, last_n: int=0, overwrite: bool=True,
+                 prefix: Prefix=Prefix.NO_PREFIX):
         """
         Constructor of the bulkdownloader
         @param url: URL of the RSS feed or web directory
@@ -188,7 +207,7 @@ class BulkDownloader:
         self._overwrite = overwrite
         self._prefix = prefix
 
-    def last_n(self, n: int = None):
+    def last_n(self, n: int=None):
         """
         Set and return the last_n parameter
         @param n: New last_n value
@@ -198,7 +217,7 @@ class BulkDownloader:
             self._last_n = n
         return self._last_n
 
-    def overwrite(self, overwrite: bool = None) -> bool:
+    def overwrite(self, overwrite: bool=None) -> bool:
         """
         Set and return the overwrite parameter
         @param overwrite: New overwrite value
@@ -208,7 +227,7 @@ class BulkDownloader:
             self._overwrite = overwrite
         return self._overwrite
 
-    def prefix(self, prefix: Prefix = None) -> Prefix:
+    def prefix(self, prefix: Prefix=None) -> Prefix:
         """
         Set and return the prefix with datetime parameter
         @param prefix: New prefix value
@@ -218,7 +237,7 @@ class BulkDownloader:
             self._prefix = prefix
         return self._prefix
 
-    def folder(self, folder: str = None) -> str:
+    def folder(self, folder: str=None) -> str:
         """
         Set and return the save folder
         @param folder: New path of the folder
@@ -237,7 +256,7 @@ class BulkDownloader:
         except URLError as url_error:
             return hasattr(url_error, 'code')
 
-    def list_mp3(self, cb: Callback = None, verbose: bool = False) -> List[Episode]:
+    def list_mp3(self, cb: Callback=None, verbose: bool=False) -> List[Episode]:
         """
         Will fetch the RSS or directory info and return the list of available MP3s
         @param cb: Callback object
@@ -287,7 +306,7 @@ class BulkDownloader:
                 logging.info(elem)
         return to_download
 
-    def download_mp3(self, cb: Callback = None, dry_run: bool = False):
+    def download_mp3(self, cb: Callback=None, dry_run: bool=False):
         """
         Will get the list of MP3s and download them into the specified folder
         @param cb: Callback object
@@ -323,6 +342,7 @@ class BulkDownloader:
 
             # Getting the name and path
             name = episode.get_filename(self.prefix())
+            description = episode.get_description()
             path = os.path.normpath(os.path.join(self.folder(), name))
             if len(path) >= 260:
                 short_path = path[:-3][0:256] + ".mp3"
@@ -341,7 +361,7 @@ class BulkDownloader:
             logging.info('Saving {} to {} from {}'.format(name, path, episode.url()))
             if cb:
                 cb.set_function(lambda x: (count + x / 100) * step)
-            if not dry_run and try_download(episode.url(), path, cb=cb):
+            if not dry_run and try_download(episode.url(), description, path, cb=cb):
                 downloads_successful += 1
             if cb:
                 cb.set_function(lambda x: x)
@@ -364,7 +384,7 @@ class BulkDownloader:
         for item in pod_feed.items:
             pub_date_time = datetime.datetime.utcfromtimestamp(item.time_published) \
                 if item.time_published > 0 else item.published_date
-            episodes.append(Episode(item.enclosure_url, item.title, pub_date_time))
+            episodes.append(Episode(item.enclosure_url, item.title, pub_date_time, item.description))
         return episodes
 
     @staticmethod
@@ -376,7 +396,7 @@ class BulkDownloader:
             return False
 
 
-def download_mp3s(url: str, folder: str, last_n: int, overwrite: bool = True, prefix: Prefix = Prefix.NO_PREFIX):
+def download_mp3s(url: str, folder: str, last_n: int, overwrite: bool=True, prefix: Prefix=Prefix.NO_PREFIX):
     """
     Will create a BulkDownloader and download all the mp3s from an URL to the folder
     @param url: Directory/RSS url
